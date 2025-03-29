@@ -9,7 +9,7 @@ interface BlogPost {
   content: string;
   authorId: number | null;
   status: string;
-  publishedAt: Date | null;
+  publishedAt: string | null;
   createdAt: string;
   featuredImage: string | null;
   categories: string[] | null;
@@ -22,7 +22,7 @@ interface BlogPostCardProps {
 
 export default function BlogPostCard({ post }: BlogPostCardProps) {
   const formattedDate = post.publishedAt
-    ? format(post.publishedAt, "MMMM d, yyyy")
+    ? format(new Date(post.publishedAt), "MMMM d, yyyy")
     : format(new Date(post.createdAt), "MMMM d, yyyy");
 
   return (

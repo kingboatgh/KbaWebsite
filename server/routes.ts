@@ -5,6 +5,33 @@ import { insertContactSchema, insertBlogPostSchema, insertBlogCommentSchema } fr
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { log } from "./vite";
+import multer from "multer";
+import path from "path";
+import { v4 as uuidv4 } from "uuid";
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, "public/uploads");
+    },
+    filename: (req, file, cb) => {
+      const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
+      cb(null, uniqueName);
+    },
+  }),
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed."));
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   try {
@@ -204,6 +231,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         log(`Error deleting blog comment: ${error instanceof Error ? error.message : 'Unknown error'}`);
         res.status(500).json({ success: false, error: "Failed to delete blog comment" });
+      }
+    });
+
+    // Image upload endpoint
+    app.post("/api/upload", upload.single("image"), async (req: Request, res: Response) => {
+      try {
+        if (!req.file) {
+          res.status(400).json({ success: false, error: "No file uploaded" });
+          return;
+        }
+
+        const fileUrl = `/uploads/${req.file.filename}`;
+        res.status(200).json({ success: true, url: fileUrl });
+      } catch (error) {
+        log(`Error uploading file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        res.status(500).json({ success: false, error: "Failed to upload file" });
       }
     });
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import MainLayout from "@/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BlogPagination } from "@/components/ui/BlogPagination";
 import { useToast } from "@/components/ui/use-toast";
+import { ImageIcon, X } from "lucide-react";
 
 interface BlogPost {
   id: number;
@@ -16,7 +17,7 @@ interface BlogPost {
   content: string;
   authorId: number | null;
   status: string;
-  publishedAt: Date | null;
+  publishedAt: string | null;
   createdAt: string;
   featuredImage: string | null;
   categories: string[] | null;
@@ -30,7 +31,7 @@ interface CreateBlogPost {
   excerpt?: string;
   authorId: number;
   status: string;
-  publishedAt?: Date;
+  publishedAt?: string;
   featuredImage?: string;
   categories?: string[];
   tags?: string[];
@@ -49,6 +50,9 @@ export default function BlogAdmin() {
   const [status, setStatus] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const limit = 10;
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -79,27 +83,17 @@ export default function BlogAdmin() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          title: post.title,
-          slug: post.slug,
-          content: post.content,
-          excerpt: post.excerpt,
-          authorId: post.authorId,
-          status: post.status,
-          publishedAt: post.status === "published" ? new Date() : undefined,
-          featuredImage: post.featuredImage,
-          categories: post.categories,
-          tags: post.tags,
+          ...post,
+          publishedAt: post.status === "published" ? new Date().toISOString() : undefined,
         }),
       });
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to create blog post");
+        throw new Error("Failed to create blog post");
       }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["blog-posts"] });
-      setIsCreating(false);
       toast({
         title: "Success",
         description: "Blog post created successfully",
@@ -115,32 +109,24 @@ export default function BlogAdmin() {
   });
 
   const updatePostMutation = useMutation({
-    mutationFn: async ({ id, post }: { id: number; post: Partial<BlogPost> }) => {
+    mutationFn: async ({ id, post }: { id: number; post: Partial<CreateBlogPost> }) => {
       const response = await fetch(`/api/blog/posts/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          title: post.title,
-          slug: post.slug,
-          content: post.content,
-          excerpt: post.excerpt,
-          status: post.status,
-          publishedAt: post.status === "published" ? new Date() : undefined,
-          categories: post.categories,
-          tags: post.tags,
+          ...post,
+          publishedAt: post.status === "published" ? new Date().toISOString() : undefined,
         }),
       });
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update blog post");
+        throw new Error("Failed to update blog post");
       }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["blog-posts"] });
-      setEditingPost(null);
       toast({
         title: "Success",
         description: "Blog post updated successfully",
@@ -179,6 +165,26 @@ export default function BlogAdmin() {
       });
     },
   });
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   if (isLoading) {
     return (
@@ -347,7 +353,7 @@ export default function BlogAdmin() {
                 {editingPost ? "Edit Post" : "Create New Post"}
               </h2>
               <form
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
                   const formData = new FormData(e.currentTarget);
                   
@@ -366,6 +372,35 @@ export default function BlogAdmin() {
                     .map(t => t.trim())
                     .filter(t => t.length > 0);
 
+                  let featuredImage = editingPost?.featuredImage;
+
+                  // Handle image upload if a new image is selected
+                  if (selectedImage) {
+                    const imageFormData = new FormData();
+                    imageFormData.append("image", selectedImage);
+                    
+                    try {
+                      const response = await fetch("/api/upload", {
+                        method: "POST",
+                        body: imageFormData,
+                      });
+                      
+                      if (!response.ok) {
+                        throw new Error("Failed to upload image");
+                      }
+                      
+                      const { url } = await response.json();
+                      featuredImage = url;
+                    } catch (error) {
+                      toast({
+                        title: "Error",
+                        description: "Failed to upload image. Please try again.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                  }
+
                   if (editingPost) {
                     // Update existing post
                     updatePostMutation.mutate({
@@ -376,7 +411,8 @@ export default function BlogAdmin() {
                         content,
                         excerpt: excerpt || undefined,
                         status,
-                        publishedAt: status === "published" ? new Date() : undefined,
+                        publishedAt: status === "published" ? new Date().toISOString() : undefined,
+                        featuredImage: featuredImage || undefined,
                         categories: categories.length > 0 ? categories : undefined,
                         tags: tags.length > 0 ? tags : undefined,
                       },
@@ -390,8 +426,8 @@ export default function BlogAdmin() {
                       excerpt: excerpt || undefined,
                       authorId: 1,
                       status,
-                      publishedAt: status === "published" ? new Date() : undefined,
-                      featuredImage: undefined,
+                      publishedAt: status === "published" ? new Date().toISOString() : undefined,
+                      featuredImage: featuredImage || undefined,
                       categories: categories.length > 0 ? categories : undefined,
                       tags: tags.length > 0 ? tags : undefined,
                     };
@@ -482,6 +518,51 @@ export default function BlogAdmin() {
                     placeholder="javascript, react, typescript"
                     defaultValue={editingPost?.tags?.join(", ")}
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Featured Image
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-full">
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        accept="image/*"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <ImageIcon className="w-4 h-4 mr-2" />
+                        {selectedImage ? "Change Image" : "Select Image"}
+                      </Button>
+                    </div>
+                    {selectedImage && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleRemoveImage}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {(imagePreview || editingPost?.featuredImage) && (
+                    <div className="mt-4">
+                      <img
+                        src={imagePreview || editingPost?.featuredImage || ""}
+                        alt="Preview"
+                        className="max-h-48 rounded-lg object-cover"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="flex justify-end gap-4">
                   <Button
