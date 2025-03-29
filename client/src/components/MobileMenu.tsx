@@ -1,5 +1,6 @@
 import { Dispatch, SetStateAction } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Link } from "wouter";
 
 interface MobileMenuProps {
   isOpen: boolean;
@@ -63,6 +64,13 @@ export default function MobileMenu({ isOpen, setIsOpen }: MobileMenuProps) {
               >
                 Portfolio
               </a>
+              <Link 
+                href="/blog" 
+                className="font-medium text-neutral-700 hover:text-[#0F4C81] transition-colors"
+                onClick={handleLinkClick}
+              >
+                Blog
+              </Link>
               <a 
                 href="#contact" 
                 className="font-medium text-neutral-700 hover:text-[#0F4C81] transition-colors"

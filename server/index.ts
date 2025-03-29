@@ -44,26 +44,38 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   res.status(status).json({ message });
   // Log the error but don't throw it
   log(`Error: ${message}`);
+  if (err.stack) {
+    log(`Stack trace: ${err.stack}`);
+  }
 });
 
 const startServer = async () => {
   try {
+    log("Starting server initialization...");
+    
+    log("Registering routes...");
     const server = await registerRoutes(app);
+    log("Routes registered successfully");
 
     // importantly only setup vite in development and after
     // setting up all the other routes so the catch-all route
     // doesn't interfere with the other routes
     if (app.get("env") === "development") {
+      log("Setting up Vite development server...");
       await setupVite(app, server);
+      log("Vite development server setup complete");
     } else {
+      log("Setting up static file serving...");
       serveStatic(app);
+      log("Static file serving setup complete");
     }
 
-    // ALWAYS serve the app on port 8080
+    // ALWAYS serve the app on port 5500
     // this serves both the API and the client.
     // It is the only port that is not firewalled.
-    const port = 8080;
+    const port = 5500;
     
+    log(`Attempting to start server on port ${port}...`);
     server.listen({
       port,
       host: "0.0.0.0",
@@ -72,12 +84,29 @@ const startServer = async () => {
       log(`Server is running on port ${port}`);
     }).on('error', (err) => {
       log(`Failed to start server: ${err.message}`);
+      if (err.stack) {
+        log(`Stack trace: ${err.stack}`);
+      }
       process.exit(1);
     });
   } catch (error) {
     log(`Failed to initialize server: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (error instanceof Error && error.stack) {
+      log(`Stack trace: ${error.stack}`);
+    }
     process.exit(1);
   }
 };
+
+// Handle process termination gracefully
+process.on('SIGTERM', () => {
+  log('Received SIGTERM. Shutting down gracefully...');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  log('Received SIGINT. Shutting down gracefully...');
+  process.exit(0);
+});
 
 startServer();
