@@ -639,3 +639,35 @@
 {"level":"info","message":"GET /api/blog/categories 304 in 1ms :: {\"success\":true,\"data\":[]}","timestamp":"2025-03-30T02:30:36.594Z"}
 {"level":"info","message":"GET /api/blog/tags 304 in 0ms :: {\"success\":true,\"data\":[]}","timestamp":"2025-03-30T02:30:36.594Z"}
 {"level":"info","message":"GET /api/blog/posts 304 in 0ms :: {\"success\":true,\"data\":{\"posts\":[],\"total\":0}}","timestamp":"2025-03-30T02:30:36.595Z"}
+{"level":"info","message":"Starting server initialization...","timestamp":"2025-03-30T03:30:38.615Z"}
+{"level":"info","message":"File cleanup scheduler initialized","timestamp":"2025-03-30T03:30:38.616Z"}
+{"level":"info","message":"Registering routes...","timestamp":"2025-03-30T03:30:38.616Z"}
+{"level":"info","message":"Initializing routes...","timestamp":"2025-03-30T03:30:38.616Z"}
+{"level":"info","message":"Creating HTTP server...","timestamp":"2025-03-30T03:30:38.617Z"}
+{"level":"info","message":"HTTP server created successfully","timestamp":"2025-03-30T03:30:38.617Z"}
+{"level":"info","message":"Routes registered successfully","timestamp":"2025-03-30T03:30:38.617Z"}
+{"level":"info","message":"Setting up Vite development server...","timestamp":"2025-03-30T03:30:38.617Z"}
+{"level":"info","message":"Vite development server setup complete","timestamp":"2025-03-30T03:30:38.784Z"}
+{"level":"info","message":"Attempting to start server on port 5500...","timestamp":"2025-03-30T03:30:38.785Z"}
+{"level":"info","message":"Server is running on port 5500","timestamp":"2025-03-30T03:30:38.786Z"}
+{"email":"admin@example.com","id":1,"level":"info","message":"Default admin user created:","role":"admin","timestamp":"2025-03-30T03:30:38.951Z"}
+{"level":"info","message":"GET /api/blog/featured 200 in 2ms :: {\"success\":true,\"data\":[]}","timestamp":"2025-03-30T03:31:39.158Z"}
+{"level":"info","message":"GET /api/blog/categories 200 in 3ms :: {\"success\":true,\"data\":[]}","timestamp":"2025-03-30T03:31:39.161Z"}
+{"level":"info","message":"GET /api/blog/tags 200 in 3ms :: {\"success\":true,\"data\":[]}","timestamp":"2025-03-30T03:31:39.161Z"}
+{"level":"info","message":"GET /api/blog/posts 200 in 3ms :: {\"success\":true,\"data\":{\"posts\":[],\"total\":0}}","timestamp":"2025-03-30T03:31:39.161Z"}
+{"level":"info","message":"GET /api/blog/featured 200 in 1ms :: {\"success\":true,\"data\":[]}","timestamp":"2025-03-30T03:31:49.417Z"}
+{"level":"info","message":"GET /api/blog/categories 200 in 0ms :: {\"success\":true,\"data\":[]}","timestamp":"2025-03-30T03:31:49.417Z"}
+{"level":"info","message":"GET /api/blog/tags 200 in 1ms :: {\"success\":true,\"data\":[]}","timestamp":"2025-03-30T03:31:49.418Z"}
+{"level":"info","message":"GET /api/blog/posts 200 in 1ms :: {\"success\":true,\"data\":{\"posts\":[],\"total\":0}}","timestamp":"2025-03-30T03:31:49.418Z"}
+{"level":"info","message":"Starting server initialization...","timestamp":"2025-03-30T03:32:15.923Z"}
+{"level":"info","message":"File cleanup scheduler initialized","timestamp":"2025-03-30T03:32:15.924Z"}
+{"level":"info","message":"Registering routes...","timestamp":"2025-03-30T03:32:15.924Z"}
+{"level":"info","message":"Initializing routes...","timestamp":"2025-03-30T03:32:15.925Z"}
+{"level":"info","message":"Creating HTTP server...","timestamp":"2025-03-30T03:32:15.925Z"}
+{"level":"info","message":"HTTP server created successfully","timestamp":"2025-03-30T03:32:15.925Z"}
+{"level":"info","message":"Routes registered successfully","timestamp":"2025-03-30T03:32:15.925Z"}
+{"level":"info","message":"Setting up Vite development server...","timestamp":"2025-03-30T03:32:15.926Z"}
+{"level":"info","message":"Vite development server setup complete","timestamp":"2025-03-30T03:32:16.093Z"}
+{"level":"info","message":"Attempting to start server on port 5500...","timestamp":"2025-03-30T03:32:16.094Z"}
+{"level":"info","message":"Server is running on port 5500","timestamp":"2025-03-30T03:32:16.096Z"}
+{"email":"admin@example.com","id":1,"level":"info","message":"Default admin user created:","role":"admin","timestamp":"2025-03-30T03:32:16.293Z"}
