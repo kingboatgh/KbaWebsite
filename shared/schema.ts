@@ -1,27 +1,31 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { text, integer, sqliteTable } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
+export const users = sqliteTable("users", {
+  id: integer("id").primaryKey(),
+  username: text("username").notNull(),
+  email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  role: text("role", { enum: ["admin", "editor"] }).notNull().default("editor"),
 });
 
-export const contactSubmissions = pgTable("contact_submissions", {
-  id: serial("id").primaryKey(),
+export const contactSubmissions = sqliteTable("contact_submissions", {
+  id: integer("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull(),
-  company: text("company"),
-  service: text("service").notNull(),
   message: text("message").notNull(),
-  consent: boolean("consent").notNull(),
-  createdAt: text("created_at").notNull()
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
+  email: true,
   password: true,
+  role: true,
 });
 
 export const insertContactSchema = createInsertSchema(contactSubmissions).omit({
@@ -36,64 +40,69 @@ export type InsertContact = z.infer<typeof insertContactSchema>;
 export type ContactSubmission = typeof contactSubmissions.$inferSelect;
 
 // Blog Post Schema
-export const blogPosts = pgTable("blog_posts", {
-  id: serial("id").primaryKey(),
+export const blogPosts = sqliteTable("blog_posts", {
+  id: integer("id").primaryKey(),
   title: text("title").notNull(),
   slug: text("slug").notNull().unique(),
   content: text("content").notNull(),
   excerpt: text("excerpt"),
-  authorId: integer("author_id").references(() => users.id),
-  status: text("status").notNull().default("draft"), // draft, published, archived
-  publishedAt: timestamp("published_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
   featuredImage: text("featured_image"),
-  metaDescription: text("meta_description"),
-  metaKeywords: text("meta_keywords"),
-  categories: jsonb("categories").$type<string[]>(),
-  tags: jsonb("tags").$type<string[]>(),
-  isFeatured: boolean("is_featured").default(false),
+  status: text("status", { enum: ["draft", "published"] })
+    .notNull()
+    .default("draft"),
+  publishedAt: text("published_at"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  categories: text("categories"),
+  tags: text("tags"),
+  authorId: integer("author_id").references(() => users.id),
+  viewCount: integer("view_count").default(0),
+  likes: integer("likes").default(0),
 });
 
 // Blog Comments Schema
-export const blogComments = pgTable("blog_comments", {
-  id: serial("id").primaryKey(),
-  postId: integer("post_id").references(() => blogPosts.id),
-  authorName: text("author_name").notNull(),
-  authorEmail: text("author_email").notNull(),
+export const blogComments = sqliteTable("blog_comments", {
+  id: integer("id").primaryKey(),
+  postId: integer("post_id")
+    .notNull()
+    .references(() => blogPosts.id),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
   content: text("content").notNull(),
-  status: text("status").notNull().default("pending"), // pending, approved, rejected
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Zod schemas for validation
 export const insertBlogPostSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  slug: z.string().min(1, "Slug is required"),
+  title: z.string().min(1, "Title is required").max(255, "Title is too long"),
+  slug: z.string().min(1, "Slug is required").max(255, "Slug is too long"),
   content: z.string().min(1, "Content is required"),
-  excerpt: z.string().optional(),
-  authorId: z.number(),
-  status: z.enum(["draft", "published", "archived"]),
-  publishedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  excerpt: z.string().max(500, "Excerpt is too long").optional(),
+  status: z.enum(["draft", "published"]).default("draft"),
+  publishedAt: z.string().optional(),
   featuredImage: z.string().optional(),
-  metaDescription: z.string().optional(),
-  metaKeywords: z.string().optional(),
-  categories: z.array(z.string()).optional(),
-  tags: z.array(z.string()).optional(),
-  isFeatured: z.boolean().optional(),
+  categories: z.array(z.string().min(1, "Category cannot be empty")).max(5, "Too many categories").optional(),
+  tags: z.array(z.string().min(1, "Tag cannot be empty")).max(10, "Too many tags").optional(),
+  authorId: z.number().nullable().optional(),
+  viewCount: z.number().min(0).optional(),
+  likes: z.number().min(0).optional(),
 });
 
 export const insertBlogCommentSchema = z.object({
   postId: z.number(),
-  authorName: z.string().min(1, "Name is required"),
-  authorEmail: z.string().email("Invalid email address"),
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email address"),
   content: z.string().min(1, "Comment is required"),
-  status: z.enum(["pending", "approved", "rejected"]).optional(),
 });
 
 // Types
 export type BlogPost = typeof blogPosts.$inferSelect;
-export type InsertBlogPost = typeof blogPosts.$inferInsert;
+export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
 export type BlogComment = typeof blogComments.$inferSelect;
 export type InsertBlogComment = typeof blogComments.$inferInsert;

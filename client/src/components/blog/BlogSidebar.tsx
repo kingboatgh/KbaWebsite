@@ -1,129 +1,243 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
-import BlogPostCard from "./BlogPostCard";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Calendar, Tag, Clock, ChevronRight, BookOpen, Share2, Heart } from "lucide-react";
+import { formatDate } from "@/lib/utils";
+import { useState } from "react";
 
 interface BlogPost {
   id: number;
   title: string;
   slug: string;
   excerpt: string | null;
-  content: string;
-  authorId: number | null;
-  status: string;
-  publishedAt: string | null;
-  createdAt: string;
   featuredImage: string | null;
-  categories: string[] | null;
-  tags: string[] | null;
+  publishedAt: string | null;
+  categories: string[];
+  tags: string[];
+  authorId: number | null;
+  viewCount: number;
+  likes: number;
+}
+
+interface FeaturedPostsResponse {
+  success: boolean;
+  data: BlogPost[];
+}
+
+interface CategoriesResponse {
+  success: boolean;
+  data: string[];
+}
+
+interface TagsResponse {
+  success: boolean;
+  data: string[];
 }
 
 export default function BlogSidebar() {
-  const { data: featuredPosts } = useQuery<{ data: BlogPost[] }>({
-    queryKey: ["featured-posts"],
+  // Fetch featured posts
+  const { data: featuredData, isLoading: isLoadingFeatured } = useQuery<FeaturedPostsResponse>({
+    queryKey: ["featuredPosts"],
     queryFn: async () => {
       const response = await fetch("/api/blog/featured?limit=3");
-      if (!response.ok) {
-        throw new Error("Failed to fetch featured posts");
-      }
+      if (!response.ok) throw new Error("Failed to fetch featured posts");
       return response.json();
     },
   });
 
-  // Mock data for categories and tags (in a real app, these would come from the API)
-  const categories = [
-    "Technology",
-    "Lifestyle",
-    "Business",
-    "Design",
-    "Development",
-  ];
+  // Fetch categories
+  const { data: categoriesData, isLoading: isLoadingCategories } = useQuery<CategoriesResponse>({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const response = await fetch("/api/blog/categories");
+      if (!response.ok) throw new Error("Failed to fetch categories");
+      return response.json();
+    },
+  });
 
-  const tags = [
-    "Web",
-    "Design",
-    "Development",
-    "UI/UX",
-    "Mobile",
-    "Cloud",
-    "Security",
-    "Performance",
-  ];
+  // Fetch tags
+  const { data: tagsData, isLoading: isLoadingTags } = useQuery<TagsResponse>({
+    queryKey: ["tags"],
+    queryFn: async () => {
+      const response = await fetch("/api/blog/tags");
+      if (!response.ok) throw new Error("Failed to fetch tags");
+      return response.json();
+    },
+  });
+
+  // Newsletter subscription
+  const [email, setEmail] = useState("");
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [subscribeStatus, setSubscribeStatus] = useState<"idle" | "success" | "error">("idle");
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubscribing(true);
+    try {
+      const response = await fetch("/api/newsletter/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!response.ok) throw new Error("Failed to subscribe");
+      setSubscribeStatus("success");
+      setEmail("");
+    } catch (error) {
+      setSubscribeStatus("error");
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
+
+  // Calculate reading time
+  const calculateReadingTime = (text: string | null): number => {
+    if (!text) return 0;
+    const wordsPerMinute = 200;
+    const words = text.trim().split(/\s+/).length;
+    return Math.ceil(words / wordsPerMinute);
+  };
 
   return (
     <div className="space-y-8">
       {/* Featured Posts */}
-      <div>
-        <h3 className="text-xl font-semibold mb-4">Featured Posts</h3>
-        <div className="space-y-4">
-          {featuredPosts?.data.map((post) => (
-            <div key={post.id} className="bg-white rounded-lg shadow-sm p-4">
-              <Link href={`/blog/${post.slug}`}>
-                <h4 className="font-medium hover:text-blue-600 line-clamp-2">
-                  {post.title}
-                </h4>
-              </Link>
-              {post.excerpt && (
-                <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                  {post.excerpt}
-                </p>
-              )}
-            </div>
-          ))}
+      <Card className="overflow-hidden">
+        <div className="p-6 border-b">
+          <h3 className="text-lg font-semibold">Featured Posts</h3>
         </div>
-      </div>
+        <div className="divide-y">
+          {isLoadingFeatured ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="p-4">
+                <div className="flex gap-4">
+                  <Skeleton className="w-20 h-20 rounded-md" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            featuredData?.data.map((post) => (
+              <a
+                key={post.id}
+                href={`/blog/${post.slug}`}
+                className="block p-4 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex gap-4">
+                  {post.featuredImage && (
+                    <img
+                      src={post.featuredImage}
+                      alt={post.title}
+                      className="w-20 h-20 object-cover rounded-md"
+                    />
+                  )}
+                  <div className="flex-1">
+                    <h4 className="font-medium line-clamp-2 hover:text-primary">
+                      {post.title}
+                    </h4>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {formatDate(post.publishedAt || "")}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {calculateReadingTime(post.excerpt)} min read
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </a>
+            ))
+          )}
+        </div>
+      </Card>
 
       {/* Categories */}
-      <div>
-        <h3 className="text-xl font-semibold mb-4">Categories</h3>
-        <div className="flex flex-wrap gap-2">
-          {categories.map((category) => (
-            <Link
-              key={category}
-              href={`/blog?category=${category.toLowerCase()}`}
-              className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200"
-            >
-              {category}
-            </Link>
-          ))}
+      <Card className="overflow-hidden">
+        <div className="p-6 border-b">
+          <h3 className="text-lg font-semibold">Categories</h3>
         </div>
-      </div>
+        <div className="p-6">
+          <div className="flex flex-wrap gap-2">
+            {isLoadingCategories ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-6 w-20" />
+              ))
+            ) : (
+              categoriesData?.data.map((category) => (
+                <Badge
+                  key={category}
+                  variant="secondary"
+                  className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                >
+                  {category}
+                </Badge>
+              ))
+            )}
+          </div>
+        </div>
+      </Card>
 
       {/* Tags */}
-      <div>
-        <h3 className="text-xl font-semibold mb-4">Tags</h3>
-        <div className="flex flex-wrap gap-2">
-          {tags.map((tag) => (
-            <Link
-              key={tag}
-              href={`/blog?tag=${tag.toLowerCase()}`}
-              className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200"
-            >
-              {tag}
-            </Link>
-          ))}
+      <Card className="overflow-hidden">
+        <div className="p-6 border-b">
+          <h3 className="text-lg font-semibold">Popular Tags</h3>
         </div>
-      </div>
+        <div className="p-6">
+          <div className="flex flex-wrap gap-2">
+            {isLoadingTags ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-6 w-16" />
+              ))
+            ) : (
+              tagsData?.data.slice(0, 8).map((tag) => (
+                <Badge
+                  key={tag}
+                  variant="outline"
+                  className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                >
+                  <Tag className="w-3 h-3 mr-1" />
+                  {tag}
+                </Badge>
+              ))
+            )}
+          </div>
+        </div>
+      </Card>
 
-      {/* Newsletter Signup */}
-      <div className="bg-blue-50 p-6 rounded-lg">
-        <h3 className="text-xl font-semibold mb-2">Subscribe to Newsletter</h3>
-        <p className="text-gray-600 mb-4">
-          Get the latest posts delivered right to your inbox.
-        </p>
-        <form className="space-y-4">
-          <input
-            type="email"
-            placeholder="Enter your email"
-            className="w-full px-4 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Subscribe
-          </button>
-        </form>
-      </div>
+      {/* Newsletter */}
+      <Card className="overflow-hidden bg-gradient-to-r from-primary/10 to-primary/5">
+        <div className="p-6">
+          <h3 className="text-lg font-semibold mb-2">Newsletter</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Subscribe to get the latest posts and updates delivered to your inbox.
+          </p>
+          <form onSubmit={handleSubscribe} className="space-y-2">
+            <Input
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="h-10"
+            />
+            <Button type="submit" className="w-full" disabled={isSubscribing}>
+              {isSubscribing ? "Subscribing..." : "Subscribe"}
+            </Button>
+            {subscribeStatus === "success" && (
+              <p className="text-sm text-green-600">Successfully subscribed!</p>
+            )}
+            {subscribeStatus === "error" && (
+              <p className="text-sm text-red-600">Failed to subscribe. Please try again.</p>
+            )}
+          </form>
+        </div>
+      </Card>
     </div>
   );
 } 

@@ -1,13 +1,28 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { registerRoutes } from "./routes.js";
+import { setupVite, serveStatic, log } from "./vite.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import cors from "cors";
+import { createServer as createViteServer } from "vite";
+import blogRoutes from "./routes/blog.js";
+import uploadRoutes from "./routes/upload.js";
+import authRoutes from "./routes/auth.js";
+import adminRoutes from "./routes/admin.js";
+import { scheduleFileCleanup } from "./utils/fileCleanup.js";
+import dotenv from "dotenv";
+
+// Load environment variables
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const port = process.env.PORT || 5500;
+
+// Middleware
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -57,9 +72,35 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   }
 });
 
+// API Routes
+app.use("/api/blog", blogRoutes);
+app.use("/api/upload", uploadRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+
+// Development server setup
+if (process.env.NODE_ENV !== "production") {
+  const vite = await createViteServer({
+    server: { middlewareMode: true },
+    appType: "spa",
+  });
+
+  app.use(vite.middlewares);
+} else {
+  // Serve static files in production
+  app.use(express.static(path.join(__dirname, "../dist/client")));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../dist/client/index.html"));
+  });
+}
+
 const startServer = async () => {
   try {
     log("Starting server initialization...");
+    
+    // Schedule file cleanup
+    scheduleFileCleanup();
+    log("File cleanup scheduler initialized");
     
     log("Registering routes...");
     const server = await registerRoutes(app);
@@ -81,7 +122,6 @@ const startServer = async () => {
     // ALWAYS serve the app on port 5500
     // this serves both the API and the client.
     // It is the only port that is not firewalled.
-    const port = process.env.PORT || 5500;
     
     log(`Attempting to start server on port ${port}...`);
     server.listen({

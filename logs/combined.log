@@ -1,0 +1,4 @@
+{"email":"admin@example.com","id":1,"level":"info","message":"Default admin user created:","role":"admin","timestamp":"2025-03-30T01:37:43.259Z"}
+{"level":"info","message":"Initializing routes...","timestamp":"2025-03-30T01:37:43.332Z"}
+{"level":"info","message":"Creating HTTP server...","timestamp":"2025-03-30T01:37:43.332Z"}
+{"level":"info","message":"HTTP server created successfully","timestamp":"2025-03-30T01:37:43.332Z"}

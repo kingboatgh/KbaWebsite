@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BlogPagination } from "@/components/ui/BlogPagination";
 import { useToast } from "@/components/ui/use-toast";
-import { ImageIcon, X } from "lucide-react";
+import { ImageIcon, X, Save, Eye, Trash2, Plus, Tag, FolderOpen, Link as LinkIcon, Settings } from "lucide-react";
+import { format } from "date-fns";
 
 interface BlogPost {
   id: number;
@@ -42,6 +43,12 @@ interface BlogResponse {
     posts: BlogPost[];
     total: number;
   };
+}
+
+interface UploadResponse {
+  success: boolean;
+  url: string;
+  error?: string;
 }
 
 export default function BlogAdmin() {
@@ -94,6 +101,12 @@ export default function BlogAdmin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["blog-posts"] });
+      setIsCreating(false);
+      setSelectedImage(null);
+      setImagePreview(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       toast({
         title: "Success",
         description: "Blog post created successfully",
@@ -127,6 +140,12 @@ export default function BlogAdmin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["blog-posts"] });
+      setEditingPost(null);
+      setSelectedImage(null);
+      setImagePreview(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       toast({
         title: "Success",
         description: "Blog post updated successfully",
@@ -207,318 +226,269 @@ export default function BlogAdmin() {
   return (
     <MainLayout>
       <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-bold">Blog Admin</h1>
-          <Button onClick={() => setIsCreating(true)}>Create New Post</Button>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold">Blog Posts</h1>
+          <Button
+            onClick={() => setIsCreating(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            New Post
+          </Button>
         </div>
 
-        {/* Search and Filter */}
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
-          <Input
-            type="search"
-            placeholder="Search posts..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-md"
-          />
-          <Select value={status || undefined} onValueChange={(value) => setStatus(value || null)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="published">Published</SelectItem>
-              <SelectItem value="archived">Archived</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Blog Posts Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Title
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Published At
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {posts.length > 0 ? (
-                posts.map((post) => (
-                  <tr key={post.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{post.title}</div>
-                      <div className="text-sm text-gray-500">{post.slug}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+        {/* Posts List */}
+        {!isCreating && !editingPost && (
+          <div className="bg-white rounded-lg shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Title</th>
+                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Status</th>
+                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Date</th>
+                    <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {data?.data.posts.map((post) => (
+                    <tr key={post.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          {post.featuredImage && (
+                            <div className="w-10 h-10 rounded overflow-hidden">
+                              <img
+                                src={post.featuredImage}
+                                alt={post.title}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-medium">{post.title}</div>
+                            <div className="text-sm text-gray-500">
+                              {post.excerpt || "No excerpt"}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           post.status === "published"
                             ? "bg-green-100 text-green-800"
                             : post.status === "draft"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {post.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {post.publishedAt
-                        ? new Date(post.publishedAt).toLocaleDateString()
-                        : "Not published"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditingPost(post)}
-                        className="mr-2"
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deletePostMutation.mutate(post.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Delete
-                      </Button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4} className="px-6 py-4 text-center">
-                    <p className="text-gray-500">No posts found</p>
-                    {(search || status) && (
-                      <Button
-                        variant="outline"
-                        className="mt-4"
-                        onClick={() => {
-                          setSearch("");
-                          setStatus(null);
-                        }}
-                      >
-                        Clear filters
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {total > limit && (
-          <div className="mt-8 flex justify-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              Previous
-            </Button>
-            <Button variant="outline" disabled>
-              {page}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page * limit >= total}
-            >
-              Next
-            </Button>
+                            ? "bg-gray-100 text-gray-800"
+                            : "bg-yellow-100 text-yellow-800"
+                        }`}>
+                          {post.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {format(new Date(post.publishedAt || post.createdAt), "MMM d, yyyy")}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingPost(post)}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <Save className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => window.open(`/blog/${post.slug}`, "_blank")}
+                            className="text-gray-600 hover:text-gray-800"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deletePostMutation.mutate(post.id)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-6 py-4 border-t">
+              <BlogPagination
+                currentPage={page}
+                totalPages={Math.ceil((data?.data.total || 0) / limit)}
+                onPageChange={setPage}
+              />
+            </div>
           </div>
         )}
 
-        {/* Create/Edit Modal */}
+        {/* Create/Edit Form */}
         {(isCreating || editingPost) && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <h2 className="text-2xl font-bold mb-4">
-                {editingPost ? "Edit Post" : "Create New Post"}
-              </h2>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.currentTarget);
+          <div className="bg-white rounded-lg shadow-sm">
+            {/* Form Header */}
+            <div className="border-b px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-semibold">
+                  {editingPost ? "Edit Post" : "Create New Post"}
+                </h2>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    Save Draft
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <Eye className="w-4 h-4" />
+                    Preview
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Settings
+                  </Button>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setIsCreating(false);
+                  setEditingPost(null);
+                  setSelectedImage(null);
+                  setImagePreview(null);
+                }}
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            {/* Form Content */}
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                
+                // Get the form values
+                const title = formData.get("title") as string;
+                const slug = formData.get("slug") as string;
+                const content = formData.get("content") as string;
+                const excerpt = formData.get("excerpt") as string;
+                const status = formData.get("status") as string;
+                const categories = (formData.get("categories") as string)
+                  .split(",")
+                  .map(c => c.trim())
+                  .filter(c => c.length > 0);
+                const tags = (formData.get("tags") as string)
+                  .split(",")
+                  .map(t => t.trim())
+                  .filter(t => t.length > 0);
+
+                let featuredImage = editingPost?.featuredImage;
+
+                // Handle image upload if a new image is selected
+                if (selectedImage) {
+                  const imageFormData = new FormData();
+                  imageFormData.append("image", selectedImage);
                   
-                  // Get the form values
-                  const title = formData.get("title") as string;
-                  const slug = formData.get("slug") as string;
-                  const content = formData.get("content") as string;
-                  const excerpt = formData.get("excerpt") as string;
-                  const status = formData.get("status") as string;
-                  const categories = (formData.get("categories") as string)
-                    .split(",")
-                    .map(c => c.trim())
-                    .filter(c => c.length > 0);
-                  const tags = (formData.get("tags") as string)
-                    .split(",")
-                    .map(t => t.trim())
-                    .filter(t => t.length > 0);
-
-                  let featuredImage = editingPost?.featuredImage;
-
-                  // Handle image upload if a new image is selected
-                  if (selectedImage) {
-                    const imageFormData = new FormData();
-                    imageFormData.append("image", selectedImage);
-                    
-                    try {
-                      const response = await fetch("/api/upload", {
-                        method: "POST",
-                        body: imageFormData,
-                      });
-                      
-                      if (!response.ok) {
-                        throw new Error("Failed to upload image");
-                      }
-                      
-                      const { url } = await response.json();
-                      featuredImage = url;
-                    } catch (error) {
-                      toast({
-                        title: "Error",
-                        description: "Failed to upload image. Please try again.",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                  }
-
-                  if (editingPost) {
-                    // Update existing post
-                    updatePostMutation.mutate({
-                      id: editingPost.id,
-                      post: {
-                        title,
-                        slug,
-                        content,
-                        excerpt: excerpt || undefined,
-                        status,
-                        publishedAt: status === "published" ? new Date().toISOString() : undefined,
-                        featuredImage: featuredImage || undefined,
-                        categories: categories.length > 0 ? categories : undefined,
-                        tags: tags.length > 0 ? tags : undefined,
-                      },
+                  try {
+                    const response = await fetch("/api/upload", {
+                      method: "POST",
+                      body: imageFormData,
                     });
-                  } else {
-                    // Create new post
-                    const post: CreateBlogPost = {
+                    
+                    const data = await response.json() as UploadResponse;
+                    
+                    if (!response.ok || !data.success) {
+                      throw new Error(data.error || "Failed to upload image");
+                    }
+                    
+                    featuredImage = data.url;
+                  } catch (error) {
+                    toast({
+                      title: "Error",
+                      description: error instanceof Error ? error.message : "Failed to upload image. Please try again.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                }
+
+                if (editingPost) {
+                  // Update existing post
+                  updatePostMutation.mutate({
+                    id: editingPost.id,
+                    post: {
                       title,
                       slug,
                       content,
                       excerpt: excerpt || undefined,
-                      authorId: 1,
                       status,
                       publishedAt: status === "published" ? new Date().toISOString() : undefined,
                       featuredImage: featuredImage || undefined,
                       categories: categories.length > 0 ? categories : undefined,
                       tags: tags.length > 0 ? tags : undefined,
-                    };
-                    createPostMutation.mutate(post);
-                  }
-                }}
-                className="space-y-4"
-              >
+                    },
+                  });
+                } else {
+                  // Create new post
+                  const post: CreateBlogPost = {
+                    title,
+                    slug,
+                    content,
+                    excerpt: excerpt || undefined,
+                    authorId: 1,
+                    status,
+                    publishedAt: status === "published" ? new Date().toISOString() : undefined,
+                    featuredImage: featuredImage || undefined,
+                    categories: categories.length > 0 ? categories : undefined,
+                    tags: tags.length > 0 ? tags : undefined,
+                  };
+                  createPostMutation.mutate(post);
+                }
+              }}
+              className="grid grid-cols-1 lg:grid-cols-3 gap-8 p-6"
+            >
+              {/* Main Content */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Title */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Title
-                  </label>
                   <Input
+                    type="text"
                     name="title"
-                    required
-                    placeholder="Enter post title"
+                    placeholder="Post title"
                     defaultValue={editingPost?.title}
+                    className="text-2xl font-bold border-0 focus-visible:ring-0 px-0"
                   />
                 </div>
+
+                {/* Slug */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Slug
-                  </label>
                   <Input
+                    type="text"
                     name="slug"
-                    required
-                    placeholder="enter-post-slug"
+                    placeholder="Post slug"
                     defaultValue={editingPost?.slug}
+                    className="text-gray-500 border-0 focus-visible:ring-0 px-0"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Content
-                  </label>
-                  <Textarea
-                    name="content"
-                    required
-                    rows={10}
-                    placeholder="Write your blog post content here..."
-                    defaultValue={editingPost?.content}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Excerpt
-                  </label>
-                  <Textarea
-                    name="excerpt"
-                    rows={3}
-                    placeholder="A brief summary of your post..."
-                    defaultValue={editingPost?.excerpt || ""}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Status
-                  </label>
-                  <Select
-                    name="status"
-                    defaultValue={editingPost?.status || "draft"}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="published">Published</SelectItem>
-                      <SelectItem value="archived">Archived</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Categories (comma-separated)
-                  </label>
-                  <Input
-                    name="categories"
-                    placeholder="technology, programming, web"
-                    defaultValue={editingPost?.categories?.join(", ")}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Tags (comma-separated)
-                  </label>
-                  <Input
-                    name="tags"
-                    placeholder="javascript, react, typescript"
-                    defaultValue={editingPost?.tags?.join(", ")}
-                  />
-                </div>
+
+                {/* Featured Image */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Featured Image
@@ -564,23 +534,103 @@ export default function BlogAdmin() {
                     </div>
                   )}
                 </div>
-                <div className="flex justify-end gap-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIsCreating(false);
-                      setEditingPost(null);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit">
-                    {editingPost ? "Update" : "Create"}
-                  </Button>
+
+                {/* Content */}
+                <div>
+                  <Textarea
+                    name="content"
+                    placeholder="Write your post content here..."
+                    defaultValue={editingPost?.content}
+                    className="min-h-[400px] resize-none"
+                  />
                 </div>
-              </form>
-            </div>
+              </div>
+
+              {/* Sidebar */}
+              <div className="lg:col-span-1 space-y-6">
+                {/* Status */}
+                <div className="bg-white rounded-lg border p-4">
+                  <h3 className="font-medium mb-4">Status</h3>
+                  <Select
+                    name="status"
+                    defaultValue={editingPost?.status || "draft"}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="published">Published</SelectItem>
+                      <SelectItem value="archived">Archived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Categories */}
+                <div className="bg-white rounded-lg border p-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FolderOpen className="w-4 h-4" />
+                    <h3 className="font-medium">Categories</h3>
+                  </div>
+                  <Input
+                    type="text"
+                    name="categories"
+                    placeholder="Add categories (comma-separated)"
+                    defaultValue={editingPost?.categories?.join(", ")}
+                  />
+                </div>
+
+                {/* Tags */}
+                <div className="bg-white rounded-lg border p-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Tag className="w-4 h-4" />
+                    <h3 className="font-medium">Tags</h3>
+                  </div>
+                  <Input
+                    type="text"
+                    name="tags"
+                    placeholder="Add tags (comma-separated)"
+                    defaultValue={editingPost?.tags?.join(", ")}
+                  />
+                </div>
+
+                {/* Excerpt */}
+                <div className="bg-white rounded-lg border p-4">
+                  <h3 className="font-medium mb-4">Excerpt</h3>
+                  <Textarea
+                    name="excerpt"
+                    placeholder="Write a brief excerpt..."
+                    defaultValue={editingPost?.excerpt || ""}
+                    className="min-h-[100px]"
+                  />
+                </div>
+
+                {/* Actions */}
+                <div className="bg-white rounded-lg border p-4">
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      type="submit"
+                      className="w-full"
+                    >
+                      {editingPost ? "Update Post" : "Publish Post"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        setIsCreating(false);
+                        setEditingPost(null);
+                        setSelectedImage(null);
+                        setImagePreview(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </form>
           </div>
         )}
       </div>

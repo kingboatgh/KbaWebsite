@@ -1,4 +1,3 @@
-import MainLayout from "@/layouts/MainLayout";
 import Hero from "@/components/Hero";
 import AboutSection from "@/components/AboutSection";
 import ServicesSection from "@/components/ServicesSection";
@@ -16,12 +15,13 @@ export default function Home() {
     document.head.appendChild(script);
 
     // Add smooth scrolling behavior
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-      anchor.addEventListener('click', function(e) {
+    const anchors = document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]');
+    anchors.forEach((anchor) => {
+      anchor.addEventListener('click', function(e: Event) {
         e.preventDefault();
         
         const targetId = this.getAttribute('href');
-        if (targetId === '#') return;
+        if (!targetId || targetId === '#') return;
         
         const targetElement = document.querySelector(targetId);
         if (targetElement) {
@@ -44,13 +44,13 @@ export default function Home() {
   }, []);
 
   return (
-    <MainLayout>
+    <>
       <Hero />
       <AboutSection />
       <ServicesSection />
       <PortfolioSection />
       <StatsSection />
       <ContactSection />
-    </MainLayout>
+    </>
   );
 }

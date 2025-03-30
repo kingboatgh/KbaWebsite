@@ -1,0 +1,8 @@
+{"email":"admin@example.com","id":1,"level":"info","message":"Default admin user created:","role":"admin","timestamp":"2025-03-30T01:25:28.303Z"}
+{"level":"info","message":"Initializing routes...","timestamp":"2025-03-30T01:25:28.393Z"}
+{"level":"info","message":"Creating HTTP server...","timestamp":"2025-03-30T01:25:28.393Z"}
+{"level":"info","message":"HTTP server created successfully","timestamp":"2025-03-30T01:25:28.393Z"}
+{"email":"admin@example.com","id":1,"level":"info","message":"Default admin user created:","role":"admin","timestamp":"2025-03-30T01:28:32.453Z"}
+{"level":"info","message":"Initializing routes...","timestamp":"2025-03-30T01:28:32.525Z"}
+{"level":"info","message":"Creating HTTP server...","timestamp":"2025-03-30T01:28:32.525Z"}
+{"level":"info","message":"HTTP server created successfully","timestamp":"2025-03-30T01:28:32.525Z"}
