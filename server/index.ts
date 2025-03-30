@@ -5,12 +5,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
 import { createServer as createViteServer } from "vite";
-import blogRoutes from "./routes/blog.js";
-import uploadRoutes from "./routes/upload.js";
-import authRoutes from "./routes/auth.js";
-import adminRoutes from "./routes/admin.js";
 import { scheduleFileCleanup } from "./utils/fileCleanup.js";
 import dotenv from "dotenv";
+import { logger } from "./logger";
 
 // Load environment variables
 dotenv.config();
@@ -24,11 +21,12 @@ const port = process.env.PORT || 5500;
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from the public directory
 app.use(express.static(path.join(__dirname, "../public")));
 
+// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -51,110 +49,88 @@ app.use((req, res, next) => {
       if (logLine.length > 80) {
         logLine = logLine.slice(0, 79) + "…";
       }
-
-      log(logLine);
+      logger.info(logLine);
     }
   });
 
   next();
 });
 
-// Global error handler
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+// Error handling middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error("Unhandled error:", err);
   const status = err.status || err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
-
-  res.status(status).json({ message });
-  // Log the error but don't throw it
-  log(`Error: ${message}`);
-  if (err.stack) {
-    log(`Stack trace: ${err.stack}`);
+  const message = err.message || "Internal server error";
+  
+  // Log additional error details in development
+  if (process.env.NODE_ENV === "development") {
+    logger.error("Error details:", {
+      stack: err.stack,
+      path: req.path,
+      method: req.method,
+      body: req.body,
+      query: req.query,
+      params: req.params
+    });
   }
+  
+  res.status(status).json({
+    success: false,
+    error: message,
+  });
 });
 
-// API Routes
-app.use("/api/blog", blogRoutes);
-app.use("/api/upload", uploadRoutes);
-app.use("/api/auth", authRoutes);
-app.use("/api/admin", adminRoutes);
-
-// Development server setup
-if (process.env.NODE_ENV !== "production") {
-  const vite = await createViteServer({
-    server: { middlewareMode: true },
-    appType: "spa",
-  });
-
-  app.use(vite.middlewares);
-} else {
-  // Serve static files in production
-  app.use(express.static(path.join(__dirname, "../dist/client")));
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "../dist/client/index.html"));
-  });
-}
-
+// Register routes
 const startServer = async () => {
   try {
-    log("Starting server initialization...");
+    logger.info("Starting server initialization...");
     
-    // Schedule file cleanup
+    // Initialize file cleanup scheduler
     scheduleFileCleanup();
-    log("File cleanup scheduler initialized");
-    
-    log("Registering routes...");
+    logger.info("File cleanup scheduler initialized");
+
+    // Register routes
+    logger.info("Registering routes...");
     const server = await registerRoutes(app);
-    log("Routes registered successfully");
+    logger.info("Routes registered successfully");
 
-    // importantly only setup vite in development and after
-    // setting up all the other routes so the catch-all route
-    // doesn't interfere with the other routes
-    if (app.get("env") === "development") {
-      log("Setting up Vite development server...");
-      await setupVite(app, server);
-      log("Vite development server setup complete");
-    } else {
-      log("Setting up static file serving...");
-      serveStatic(app);
-      log("Static file serving setup complete");
-    }
+    // Setup Vite development server
+    logger.info("Setting up Vite development server...");
+    await setupVite(app, server);
+    logger.info("Vite development server setup complete");
 
-    // ALWAYS serve the app on port 5500
-    // this serves both the API and the client.
-    // It is the only port that is not firewalled.
-    
-    log(`Attempting to start server on port ${port}...`);
-    server.listen({
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    }, () => {
-      log(`Server is running on port ${port}`);
-    }).on('error', (err) => {
-      log(`Failed to start server: ${err.message}`);
-      if (err.stack) {
-        log(`Stack trace: ${err.stack}`);
-      }
+    // Start the server
+    logger.info(`Attempting to start server on port ${port}...`);
+    server.listen(port, () => {
+      logger.info(`Server is running on port ${port}`);
+    });
+
+    // Handle server errors
+    server.on("error", (error: Error) => {
+      logger.error("Server error:", error);
       process.exit(1);
     });
+
+    // Handle process termination
+    process.on("SIGTERM", () => {
+      logger.info("Received SIGTERM. Shutting down gracefully...");
+      server.close(() => {
+        logger.info("Server closed");
+        process.exit(0);
+      });
+    });
+
+    process.on("SIGINT", () => {
+      logger.info("Received SIGINT. Shutting down gracefully...");
+      server.close(() => {
+        logger.info("Server closed");
+        process.exit(0);
+      });
+    });
   } catch (error) {
-    log(`Failed to initialize server: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    if (error instanceof Error && error.stack) {
-      log(`Stack trace: ${error.stack}`);
-    }
+    logger.error("Failed to start server:", error);
     process.exit(1);
   }
 };
-
-// Handle process termination gracefully
-process.on('SIGTERM', () => {
-  log('Received SIGTERM. Shutting down gracefully...');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  log('Received SIGINT. Shutting down gracefully...');
-  process.exit(0);
-});
 
 startServer();

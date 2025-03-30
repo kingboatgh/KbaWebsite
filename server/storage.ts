@@ -85,7 +85,8 @@ export class MemStorage implements IStorage {
       // Check if admin user exists
       const adminExists = Array.from(this.users.values()).some(user => user.role === "admin");
       if (!adminExists) {
-        const hashedPassword = await bcrypt.hash("admin123", 10);
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash("admin123", salt);
         const adminUser: User = {
           id: 1,
           username: "admin",
@@ -155,6 +156,12 @@ export class MemStorage implements IStorage {
       const existingUser = this.users.get(id);
       if (!existingUser) {
         throw new Error("User not found");
+      }
+
+      // If password is being updated, hash it
+      if (user.password) {
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(user.password, salt);
       }
 
       const updatedUser: User = {

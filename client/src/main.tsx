@@ -4,9 +4,11 @@ import "./index.css";
 import { AnimatePresence } from "framer-motion";
 import { AuthProvider } from "./contexts/AuthContext";
 
-createRoot(document.getElementById("root")!).render(
+const root = createRoot(document.getElementById("root")!);
+
+root.render(
   <AuthProvider>
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       <App />
     </AnimatePresence>
   </AuthProvider>

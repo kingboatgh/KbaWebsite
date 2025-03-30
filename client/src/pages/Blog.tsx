@@ -221,7 +221,7 @@ export default function Blog() {
                     </div>
                   </Card>
                 ))
-              ) : blogData?.posts.length === 0 ? (
+              ) : !blogData || blogData.posts.length === 0 ? (
                 // No results message
                 <Card className="p-8 text-center">
                   <Filter className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -233,7 +233,7 @@ export default function Blog() {
                 </Card>
               ) : (
                 // Blog posts
-                blogData?.posts.map((post) => (
+                blogData.posts.map((post) => (
                   <motion.div
                     key={post.id}
                     initial={{ opacity: 0, y: 20 }}

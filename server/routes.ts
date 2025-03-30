@@ -173,8 +173,8 @@ const authenticateToken = (req: express.Request, res: express.Response, next: ex
 
 // Login validation schema
 const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(1, "Password is required"),
+  email: z.string().email("Invalid email address").min(1, "Email is required"),
+  password: z.string().min(1, "Password is required").min(6, "Password must be at least 6 characters"),
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -454,6 +454,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Login route
     app.post("/api/auth/login", authLimiter, async (req, res) => {
       try {
+        // Check if request body is valid JSON
+        if (!req.body || typeof req.body !== 'object') {
+          logger.warn("Login failed: Invalid request body");
+          return res.status(400).json({
+            success: false,
+            error: "Invalid request format"
+          });
+        }
+
         // Validate request body
         const validatedData = loginSchema.parse(req.body);
         logger.info("Login attempt:", { email: validatedData.email });
@@ -464,7 +473,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           logger.warn("Login failed: User not found", { email: validatedData.email });
           return res.status(401).json({ 
             success: false, 
-            message: "Invalid email or password" 
+            error: "Invalid email or password" 
           });
         }
 
@@ -474,14 +483,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           logger.warn("Login failed: Invalid password", { email: validatedData.email });
           return res.status(401).json({ 
             success: false, 
-            message: "Invalid email or password" 
+            error: "Invalid email or password" 
           });
         }
 
-        // Generate token
-        const token = jwt.sign(
+        // Generate tokens
+        const accessToken = jwt.sign(
           { userId: user.id, role: user.role },
           process.env.JWT_SECRET || "your-secret-key",
+          { expiresIn: "15m" }
+        );
+
+        const refreshToken = jwt.sign(
+          { userId: user.id },
+          process.env.JWT_REFRESH_SECRET || "your-refresh-secret-key",
           { expiresIn: "24h" }
         );
 
@@ -493,16 +508,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Send response
-        res.json({
+        return res.status(200).json({
           success: true,
-          data: {
-            token,
-            user: {
-              id: user.id,
-              email: user.email,
-              role: user.role,
-            },
-          },
+          accessToken,
+          refreshToken,
+          user: {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            username: user.username
+          }
         });
       } catch (error) {
         if (error instanceof z.ZodError) {
@@ -511,16 +526,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             errors: error.errors 
           });
           return res.status(400).json({ 
-            success: false, 
-            message: "Invalid input",
+            success: false,
+            error: "Invalid input",
             errors: error.errors 
           });
         }
         
         logger.error("Login error:", error);
-        res.status(500).json({ 
+        return res.status(500).json({ 
           success: false, 
-          message: "Internal server error" 
+          error: "Internal server error" 
         });
       }
     });

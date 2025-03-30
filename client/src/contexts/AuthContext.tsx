@@ -15,7 +15,14 @@ interface AuthContextType {
   isAuthenticated: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Create context with a default value
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  login: async () => {},
+  logout: () => {},
+  isLoading: true,
+  isAuthenticated: false,
+});
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -36,10 +43,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userStr = localStorage.getItem("user") || sessionStorage.getItem("user");
 
       if (accessToken && refreshToken && userStr) {
-        const user = JSON.parse(userStr);
-        setUser(user);
-        setIsAuthenticated(true);
-        scheduleTokenRefresh();
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id && user.email && user.role) {
+            setUser(user);
+            setIsAuthenticated(true);
+            scheduleTokenRefresh();
+          } else {
+            throw new Error("Invalid user data");
+          }
+        } catch (error) {
+          console.error("Error parsing user data:", error);
+          logout();
+        }
       } else {
         setUser(null);
         setIsAuthenticated(false);
@@ -59,8 +75,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(refreshTimeout);
     }
 
-    // Schedule refresh 1 minute before token expires (14 minutes)
-    const timeout = setTimeout(refreshToken, 14 * 60 * 1000);
+    // Schedule new refresh
+    const timeout = setTimeout(() => {
+      refreshToken();
+    }, 14 * 60 * 1000); // Refresh 1 minute before expiration
+
     setRefreshTimeout(timeout);
   };
 
@@ -79,12 +98,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ refreshToken }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to refresh token");
+      let data;
+      try {
+        data = await response.json();
+      } catch (error) {
+        console.error("Failed to parse refresh response:", error);
+        throw new Error("Server returned an invalid response");
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to refresh token");
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to refresh token");
+      }
+
       const { accessToken } = data;
+      if (!accessToken) {
+        throw new Error("Server returned an incomplete response");
+      }
 
       // Update access token in storage
       if (localStorage.getItem("refreshToken")) {
@@ -103,7 +136,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string, rememberMe: boolean = false) => {
     try {
+      setIsLoading(true);
       console.log("Attempting login with:", { email, rememberMe });
+      
+      // Basic validation
+      if (!email || !password) {
+        throw new Error("Email and password are required");
+      }
+
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
@@ -112,14 +152,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Server returned non-JSON response");
+        }
+        data = await response.json();
+      } catch (error) {
+        console.error("Failed to parse response:", error);
+        throw new Error("Server returned an invalid response");
+      }
+
       console.log("Login response:", { status: response.status, data });
 
       if (!response.ok) {
+        if (data.errors) {
+          // Handle validation errors
+          const errorMessages = data.errors.map((err: any) => err.message).join(", ");
+          throw new Error(errorMessages);
+        }
+        throw new Error(data.error || "Login failed");
+      }
+
+      if (!data.success) {
         throw new Error(data.error || "Login failed");
       }
 
       const { accessToken, refreshToken, user } = data;
+      if (!accessToken || !refreshToken || !user) {
+        throw new Error("Server returned an incomplete response");
+      }
+
+      // Validate user data
+      if (!user.id || !user.email || !user.role || !user.username) {
+        throw new Error("Server returned invalid user data");
+      }
+
       console.log("Login successful, storing tokens and user data");
 
       // Store tokens and user data
@@ -138,7 +207,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       scheduleTokenRefresh();
     } catch (error) {
       console.error("Login error:", error);
+      setUser(null);
+      setIsAuthenticated(false);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -191,11 +264,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [refreshTimeout]);
 
-  return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading, isAuthenticated }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = {
+    user,
+    login,
+    logout,
+    isLoading,
+    isAuthenticated,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
